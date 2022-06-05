@@ -2,13 +2,13 @@ package com.uty.apmobiot;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
-import android.graphics.BlendMode;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -23,12 +23,11 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import com.google.firebase.database.core.Context;
 import com.uty.apmobiot.lampuKondisi.DAOkondisiLampu;
 import com.uty.apmobiot.lampuKondisi.kondisiLampu;
 
 import com.uty.apmobiot.lampuKecerahan.DAOkecerahanLampu;
-import com.uty.apmobiot.lampuKecerahan.kecerahanLampu;
+import com.uty.apmobiot.lampuKecerahan.OtomatisLampu;
 
 import java.util.Objects;
 
@@ -38,9 +37,11 @@ public class MainActivity extends AppCompatActivity {
     TextView textStatus;
 
     SeekBar seekbarLampu;
+    SwitchCompat switchOtomatis;
     Button button;
     Drawable draw, drawseekBarLampu, seekBarOn, seekBarOff, drawBackground;
-    boolean state = false;
+    boolean stateButton = false;
+    boolean stateSwitch = false;
     int nilai = 0;
     DatabaseReference dref;
 
@@ -52,6 +53,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        switchOtomatis = findViewById(R.id.switchOtomatis);
 
         seekBarOn = ContextCompat.getDrawable(this, R.drawable.seekbar_background_on);
         seekBarOff = ContextCompat.getDrawable(this, R.drawable.seekbar_background_off);
@@ -77,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
         DAOkecerahanLampu daoKecerahanLampu = new DAOkecerahanLampu();
 
         loadData(); //Akan load data dengan shared preferences
-        kondisi(state); //Setelah data diload, akan menerapkan data tersebut
+        kondisiButton(stateButton, stateSwitch); //Setelah data diload, akan menerapkan data tersebut
         seekbarLampu.setProgress(nilai); //menerapkan nilai seekbar
         ambilDataKecerahan(); //mengambil data kecerahan dari firebase
         ambilDataKondisi();//mengambil data kondisi dari firebase
@@ -108,9 +111,14 @@ public class MainActivity extends AppCompatActivity {
 
         //listener button
         button.setOnClickListener(v -> {
-            state = button.isSelected(); //mencari tau kondisi button
-            pushKondisiLampu(daoKondisiLampu, dataKondisiLampu(state)); //mengirimkan data button ke firebase
-            kondisi(state); //membalikkan posisi button dan seekbar
+            stateButton = button.isSelected(); //mencari tau kondisi button
+            pushKondisiLampu(daoKondisiLampu, dataKondisiLampu(stateButton)); //mengirimkan data button ke firebase
+            kondisiButton(stateButton, stateSwitch); //membalikkan posisi button dan seekbar
+        });
+
+        switchOtomatis.setOnClickListener(v -> {
+            stateSwitch = switchOtomatis.isChecked();
+            kondisiSwitch(stateSwitch, stateButton);
         });
     }
 
@@ -138,7 +146,7 @@ public class MainActivity extends AppCompatActivity {
     //akan dipanggil ketika aplikasi pertama dijalankan, memanggil shared pref yang sudah tersimpan
     private void loadData(){
         SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
-        state = sharedPreferences.getBoolean(buttonLampu, false); //ketika aplikasi pertama dijalankan, defalt akan ke false
+        stateButton = sharedPreferences.getBoolean(buttonLampu, false); //ketika aplikasi pertama dijalankan, defalt akan ke false
         nilai = sharedPreferences.getInt(nilaiLampu, 0); //ketika aplikasi pertama dijalankan, default kecerahan akan ke 0
     }
 
@@ -149,7 +157,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //fungsi ketika button ditekan
-    private void kondisi(Boolean state){
+    private void kondisiSwitch(Boolean state, Boolean stateButton){
+
+        if(state){ //jika true
+            switchOtomatis.setTextOn("Otomatis");
+            if(stateButton){
+                seekbarLampu.setEnabled(!state);
+                seekbarLampu.setProgressTintList(ColorStateList.valueOf(Color.GRAY));
+                seekbarLampu.setThumbTintList(ColorStateList.valueOf(Color.DKGRAY));
+            }
+        }
+        else{
+            switchOtomatis.setTextOff("Manual");
+            if(stateButton){
+                seekbarLampu.setEnabled(!state);
+                seekbarLampu.setProgressTintList(null); //mengatur warna seekbar ke null
+                seekbarLampu.setThumbTintList(null); //mengatur warna thum ke null
+
+            }
+
+        }
+
+//        saveDataKondisi(state); //memanggil fungsi save kondisi
+//        button.setSelected(!state); //mengatur state button agar menjadi sebaliknya
+
+
+
+    }
+
+    //fungsi ketika button ditekan
+    private void kondisiButton(Boolean state, Boolean stateSwitch){
 
         if(state){ //jika true
             DrawableCompat.setTint(draw, Color.BLUE); //set warna button ke warna yang sudah ditentukan
@@ -157,6 +194,8 @@ public class MainActivity extends AppCompatActivity {
             DrawableCompat.setTint(drawBackground, ContextCompat.getColor(this, R.color.teal_700)); //set warna halaman ke warna yang sudah ditentukan
             seekbarLampu.setProgressTintList(null); //mengatur warna seekbar ke null
             seekbarLampu.setThumbTintList(null); //mengatur warna thum ke null
+            switchOtomatis.setTrackTintList(null);
+            switchOtomatis.setThumbTintList(null);
         }
         else{
             DrawableCompat.setTint(draw, Color.GRAY);
@@ -164,10 +203,21 @@ public class MainActivity extends AppCompatActivity {
             DrawableCompat.setTint(drawBackground, ContextCompat.getColor(this, R.color.TurnOff));
             seekbarLampu.setProgressTintList(ColorStateList.valueOf(Color.GRAY));
             seekbarLampu.setThumbTintList(ColorStateList.valueOf(Color.DKGRAY));
+            switchOtomatis.setTrackTintList(ColorStateList.valueOf(Color.GRAY));
+            switchOtomatis.setThumbTintList(ColorStateList.valueOf(Color.DKGRAY));
         }
         saveDataKondisi(state); //memanggil fungsi save kondisi
         button.setSelected(!state); //mengatur state button agar menjadi sebaliknya
-        seekbarLampu.setEnabled(state); //mengatur state seekbar menjadi sesuai state
+        switchOtomatis.setEnabled(state);
+
+        if(!stateSwitch){
+            seekbarLampu.setEnabled(state); //mengatur state seekbar menjadi sesuai state
+        }
+
+    }
+
+    private void slider(){
+
     }
 
     //memgambil kondisi lampu
@@ -175,8 +225,8 @@ public class MainActivity extends AppCompatActivity {
         return new kondisiLampu(state);
     }
     //mengambil kondisi kecerahan
-    private kecerahanLampu dataKecerahanLampu(int kecerahan){
-        return new kecerahanLampu(kecerahan);
+    private OtomatisLampu dataKecerahanLampu(int kecerahan){
+        return new OtomatisLampu(kecerahan);
     }
     //fungsi untuk memanggil dao kondisi lampu
     private void pushKondisiLampu(DAOkondisiLampu dao, kondisiLampu kond){
@@ -190,7 +240,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
    //fungsi untuk memanggil dao kondisi kecerahan lampu
-    private void pushKecerahanLampu(DAOkecerahanLampu dao, kecerahanLampu kecer){
+    private void pushKecerahanLampu(DAOkecerahanLampu dao, OtomatisLampu kecer){
         dao.add(kecer).addOnSuccessListener(
                         suc -> Toast.makeText(this, "Berhasil masukkan Data kecerahan", Toast.LENGTH_SHORT).show())
                 .addOnFailureListener(
@@ -225,12 +275,11 @@ public class MainActivity extends AppCompatActivity {
                 String aa = Objects.requireNonNull(snapshot.child("/kondisiLampu/kondisi").getValue()).toString();
                 Toast.makeText(getApplicationContext(), "Berhasil Update Data kondisi", Toast.LENGTH_SHORT).show();
                 boolean kond = Boolean.parseBoolean(aa);
-                kondisi(kond);
+                boolean kondSlider = false;
+//                kondisiButton(kond, kondSlider);
             }
-
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-
             }
         });
     }
